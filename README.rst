@@ -1,0 +1,3 @@
+Transpiled from https://github.com/ipfs/js-hamt-sharding/commit/a993a1e5a3dc234b118a4a32974478d3ba632af9 with no changes
+
+step 2 on the way to a pure python ipfs-unix-fs...
