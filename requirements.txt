@@ -1,2 +1,1 @@
-attrs
-py_sparse_array @ git+https://github.com/kralverde/py-sparse-array@9b6a58c4cbdab441dbc83ae9b65253c49b369f9f
+.
