@@ -1,7 +1,7 @@
 import attr
-from typing import TypeVar, Generic, Optional, Union, Generator, MutableMapping
+from typing import TypeVar, Generic, Optional, Union, Generator, MutableMapping, Iterator
 
-from sparse_array import SparseArray
+from bitmap_sparse_array import SparseArray
 from .consumable_hash import InfiniteHash, InfiniteWrapper, HashFunction, wrap_hash
 
 K = TypeVar('K', str, bytes)
@@ -25,23 +25,23 @@ class HAMTBucket(MutableMapping[K, V]):
         self._bits = bits
         self._hash = hash
         self._pop_count = 0
-        self._parent = parent
+        self._parent: Optional['HAMTBucket[K, V]'] = parent
         self._pos_at_parent = pos_at_parent
-        self._children = SparseArray[Union[HAMTBucket[K, V], HAMTBucketChild[K, V]]]()
+        self._children: SparseArray[Union[HAMTBucket[K, V], HAMTBucketChild[K, V]]] = SparseArray()
         self.key: Optional[K] = None
 
     @classmethod
-    def create_hamt(cls, hash_function: HashFunction, bits: int = 8):
+    def create_hamt(cls, hash_function: HashFunction, bits: int = 8) -> 'HAMTBucket[K, V]':
         return cls(bits, wrap_hash(hash_function))
 
-    def __setitem__(self, key: K, item: V):
+    def __setitem__(self, key: K, item: V) -> None:
         if not (isinstance(key, str) or isinstance(key, bytes)):
             raise TypeError(f'Bucket keys must be strings or bytes, not {type(key)}')
         
         place = self._find_new_bucket_and_pos(key)
         place.bucket._put_at(place, key, item)
         
-    def __getitem__(self, key: K):
+    def __getitem__(self, key: K) -> V:
         if not (isinstance(key, str) or isinstance(key, bytes)):
             raise TypeError(f'Bucket keys must be strings or bytes, not {type(key)}')
         
@@ -50,23 +50,23 @@ class HAMTBucket(MutableMapping[K, V]):
             return child.value
         raise IndexError()
     
-    def __len__(self):
+    def __len__(self) -> int:
         return self.leaf_count()
     
-    def __iter__(self):
+    def __iter__(self) -> Iterator[K]:
         for _, child in self._children.items():
             if isinstance(child, HAMTBucket):
                 yield from child
             else:
                 yield child.key
         
-    def get(self, key: K, default: Optional[V] = None):
+    def get(self, key: K, default: Optional[V] = None) -> Optional[V]:  # type: ignore[override]
         try:
             return self[key]
         except IndexError:
             return default
 
-    def __delitem__(self, key: str):
+    def __delitem__(self, key: K) -> None:
         if not (isinstance(key, str) or isinstance(key, bytes)):
             raise TypeError(f'Bucket keys must be strings or bytes, not {type(key)}')
         
@@ -84,11 +84,14 @@ class HAMTBucket(MutableMapping[K, V]):
                 result += 1
         return result
 
-    def children_count(self):
+    def children_count(self) -> int:
         return len(self._children)
 
     def only_child(self) -> Optional[HAMTBucketChild[K, V]]:
-        return self._children.get(0)
+        result = self._children.get(0)
+        if result is not None:
+            assert isinstance(result, HAMTBucketChild)
+        return result
 
     def each_leaf_series(self) -> Generator[HAMTBucketChild[K, V], None, None]:
         for _, child in self._children.items():
@@ -98,8 +101,10 @@ class HAMTBucket(MutableMapping[K, V]):
                 yield child
 
     @property
-    def table_size(self):
-        return pow(2, self._bits)
+    def table_size(self) -> int:
+        result = pow(2, self._bits)
+        assert isinstance(result, int)
+        return result
 
     def _find_child(self, key: K) -> Optional[HAMTBucketChild[K, V]]:
         result = self._find_place(key)
@@ -120,7 +125,7 @@ class HAMTBucket(MutableMapping[K, V]):
         
         return HAMTBucketPosition(self, index, hash_value, child)
     
-    def _find_new_bucket_and_pos(self, key: Union[str, InfiniteHash]) -> HAMTBucketPosition[K, V]:
+    def _find_new_bucket_and_pos(self, key: Union[K, InfiniteHash]) -> HAMTBucketPosition[K, V]:
         place = self._find_place(key)
         if place.existing_child is not None and place.existing_child.key != key:
             bucket = HAMTBucket(self._bits, self._hash, place.bucket, place.pos)
@@ -132,25 +137,25 @@ class HAMTBucket(MutableMapping[K, V]):
             return bucket._find_new_bucket_and_pos(place.hash)
         return place
 
-    def _put_at(self, place: HAMTBucketPosition[K, V], key: K, value: V):
+    def _put_at(self, place: HAMTBucketPosition[K, V], key: K, value: V) -> None:
         self._put_object_at(place.pos, HAMTBucketChild(key, value, place.hash))
 
-    def _put_object_at(self, pos: int, object: Union['HAMTBucket[K, V]', HAMTBucketChild[K, V]]):
+    def _put_object_at(self, pos: int, object: Union['HAMTBucket[K, V]', HAMTBucketChild[K, V]]) -> None:
         if self._children.get(pos) is None:
             self._pop_count += 1
         self._children[pos] = object
 
-    def _del_at(self, pos: int):
+    def _del_at(self, pos: int) -> None:
         assert pos >= 0
         if self._children.get(pos) is not None:
             self._pop_count -= 1
         del self._children[pos]
         self._level()
 
-    def _at(self, pos: int):
+    def _at(self, pos: int) -> Optional[Union[HAMTBucketChild[K, V], 'HAMTBucket[K, V]']]:
         return self._children.get(pos)
 
-    def _level(self):
+    def _level(self) -> None:
         if self._parent is not None and self._pop_count <= 1:
             if self._pop_count == 1:
                 only_child = next(self._children.values())

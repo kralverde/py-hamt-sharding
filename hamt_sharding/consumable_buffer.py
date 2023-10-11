@@ -20,10 +20,10 @@ STOP_MASKS = [
     0b11111111
 ]
 
-def mask_for(start: int, length: int):
+def mask_for(start: int, length: int) -> int:
     return START_MASKS[start] & STOP_MASKS[min(length + start - 1, 7)]
 
-def byte_bits_to_int(value: int, start: int, length: int):
+def byte_bits_to_int(value: int, start: int, length: int) -> int:
     mask = mask_for(start, length)
     return (value & mask) >> start
 
@@ -33,13 +33,13 @@ class ConsumableBuffer:
         self._current_byte_pos = len(value) - 1
         self._current_bit_pos = 7
 
-    def available_bits(self):
+    def available_bits(self) -> int:
         return self._current_bit_pos + 1 + self._current_byte_pos * 8
     
-    def total_bits(self):
+    def total_bits(self) -> int:
         return len(self._value) * 8
     
-    def _have_bits(self):
+    def _have_bits(self) -> bool:
         return self._current_byte_pos >= 0
     
     def take(self, bits: int) -> int:
@@ -59,7 +59,7 @@ class ConsumableBuffer:
                 self._current_byte_pos -= 1
         return result
     
-    def untake(self, bits: int):
+    def untake(self, bits: int) -> None:
           self._current_bit_pos += bits
           while self._current_bit_pos > 7:
               self._current_bit_pos -= 8
