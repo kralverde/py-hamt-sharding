@@ -1,4 +1,4 @@
-from typing import Callable, Union
+from typing import Callable, Union, List
 
 from .consumable_buffer import ConsumableBuffer
 
@@ -20,7 +20,7 @@ class InfiniteHash:
         self._depth = -1
         self._available_bits = 0
         self._current_buffer_index = 0
-        self._buffers = list[ConsumableBuffer]()
+        self._buffers: List[ConsumableBuffer] = list()
 
     def take(self, bits: int) -> int:
         while self._available_bits < bits:
