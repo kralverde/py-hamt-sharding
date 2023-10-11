@@ -11,13 +11,13 @@ V = TypeVar('V')
 class HAMTBucketChild(Generic[K, V]):
     key: K
     value: V
-    hash: InfiniteHash
+    infinite_hash: InfiniteHash
 
 @attr.define(slots=True)
 class HAMTBucketPosition(Generic[K, V]):
     bucket: 'HAMTBucket[K, V]'
     pos: int
-    hash: InfiniteHash
+    infinite_hash: InfiniteHash
     existing_child: Optional[HAMTBucketChild[K, V]]
 
 class HAMTBucket(MutableMapping[K, V]):
@@ -131,14 +131,14 @@ class HAMTBucket(MutableMapping[K, V]):
             bucket = HAMTBucket(self._bits, self._hash, place.bucket, place.pos)
             place.bucket._put_object_at(place.pos, bucket)
 
-            new_place = bucket._find_place(place.existing_child.hash)
+            new_place = bucket._find_place(place.existing_child.infinite_hash)
             new_place.bucket._put_at(new_place, place.existing_child.key, place.existing_child.value)
 
-            return bucket._find_new_bucket_and_pos(place.hash)
+            return bucket._find_new_bucket_and_pos(place.infinite_hash)
         return place
 
     def _put_at(self, place: HAMTBucketPosition[K, V], key: K, value: V) -> None:
-        self._put_object_at(place.pos, HAMTBucketChild(key, value, place.hash))
+        self._put_object_at(place.pos, HAMTBucketChild(key, value, place.infinite_hash))
 
     def _put_object_at(self, pos: int, object: Union['HAMTBucket[K, V]', HAMTBucketChild[K, V]]) -> None:
         if self._children.get(pos) is None:
@@ -160,10 +160,10 @@ class HAMTBucket(MutableMapping[K, V]):
             if self._pop_count == 1:
                 only_child = next(self._children.values())
                 if only_child is not None and not isinstance(only_child, HAMTBucket):
-                    only_child.hash.untake(self._bits)
+                    only_child.infinite_hash.untake(self._bits)
                     place = HAMTBucketPosition(self._parent, 
                                            self._pos_at_parent,
-                                           only_child.hash,
+                                           only_child.infinite_hash,
                                            None)
                     self._parent._put_at(place, only_child.key, only_child.value)
             else:
