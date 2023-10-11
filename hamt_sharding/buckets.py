@@ -1,7 +1,9 @@
-import attr
 from typing import TypeVar, Generic, Optional, Union, Generator, MutableMapping, Iterator
 
+import attr
+
 from bitmap_sparse_array import SparseArray
+
 from .consumable_hash import InfiniteHash, InfiniteWrapper, HashFunction, wrap_hash
 
 K = TypeVar('K', str, bytes)
@@ -21,9 +23,9 @@ class HAMTBucketPosition(Generic[K, V]):
     existing_child: Optional[HAMTBucketChild[K, V]]
 
 class HAMTBucket(MutableMapping[K, V]):
-    def __init__(self, bits: int, hash: InfiniteWrapper, parent: Optional['HAMTBucket[K, V]'] = None, pos_at_parent: int = 0):
+    def __init__(self, bits: int, infinite_wrapper: InfiniteWrapper, parent: Optional['HAMTBucket[K, V]'] = None, pos_at_parent: int = 0):
         self._bits = bits
-        self._hash = hash
+        self._infinite_wrapper = infinite_wrapper
         self._pop_count = 0
         self._parent: Optional['HAMTBucket[K, V]'] = parent
         self._pos_at_parent = pos_at_parent
@@ -35,14 +37,14 @@ class HAMTBucket(MutableMapping[K, V]):
         return cls(bits, wrap_hash(hash_function))
 
     def __setitem__(self, key: K, item: V) -> None:
-        if not (isinstance(key, str) or isinstance(key, bytes)):
+        if not isinstance(key, (str, bytes)):
             raise TypeError(f'Bucket keys must be strings or bytes, not {type(key)}')
         
         place = self._find_new_bucket_and_pos(key)
         place.bucket._put_at(place, key, item)
         
     def __getitem__(self, key: K) -> V:
-        if not (isinstance(key, str) or isinstance(key, bytes)):
+        if not isinstance(key, (str, bytes)):
             raise TypeError(f'Bucket keys must be strings or bytes, not {type(key)}')
         
         child = self._find_child(key)
@@ -67,7 +69,7 @@ class HAMTBucket(MutableMapping[K, V]):
             return default
 
     def __delitem__(self, key: K) -> None:
-        if not (isinstance(key, str) or isinstance(key, bytes)):
+        if not isinstance(key, (str, bytes)):
             raise TypeError(f'Bucket keys must be strings or bytes, not {type(key)}')
         
         place = self._find_place(key)
@@ -115,7 +117,7 @@ class HAMTBucket(MutableMapping[K, V]):
         return None
 
     def _find_place(self, key: Union[K, InfiniteHash]) -> HAMTBucketPosition[K, V]:
-        hash_value = self._hash(key.encode() if isinstance(key, str) else key)
+        hash_value = self._infinite_wrapper(key.encode() if isinstance(key, str) else key)
         index = hash_value.take(self._bits)
 
         child = self._children.get(index)
@@ -128,7 +130,7 @@ class HAMTBucket(MutableMapping[K, V]):
     def _find_new_bucket_and_pos(self, key: Union[K, InfiniteHash]) -> HAMTBucketPosition[K, V]:
         place = self._find_place(key)
         if place.existing_child is not None and place.existing_child.key != key:
-            bucket = HAMTBucket(self._bits, self._hash, place.bucket, place.pos)
+            bucket = HAMTBucket(self._bits, self._infinite_wrapper, place.bucket, place.pos)
             place.bucket._put_object_at(place.pos, bucket)
 
             new_place = bucket._find_place(place.existing_child.infinite_hash)
@@ -140,10 +142,10 @@ class HAMTBucket(MutableMapping[K, V]):
     def _put_at(self, place: HAMTBucketPosition[K, V], key: K, value: V) -> None:
         self._put_object_at(place.pos, HAMTBucketChild(key, value, place.infinite_hash))
 
-    def _put_object_at(self, pos: int, object: Union['HAMTBucket[K, V]', HAMTBucketChild[K, V]]) -> None:
+    def _put_object_at(self, pos: int, obj: Union['HAMTBucket[K, V]', HAMTBucketChild[K, V]]) -> None:
         if self._children.get(pos) is None:
             self._pop_count += 1
-        self._children[pos] = object
+        self._children[pos] = obj
 
     def _del_at(self, pos: int) -> None:
         assert pos >= 0

@@ -20,33 +20,33 @@ class InfiniteHash:
         self._depth = -1
         self._available_bits = 0
         self._current_buffer_index = 0
-        self._buffers: List[ConsumableBuffer] = list()
+        self._buffers: List[ConsumableBuffer] = []
 
     def take(self, bits: int) -> int:
         while self._available_bits < bits:
             self._produce_more_bits()
         result = 0
         while bits > 0:
-            hash = self._buffers[self._current_buffer_index]
-            avaliable = min(hash.available_bits(), bits)
-            took = hash.take(avaliable)
+            buffer_hash = self._buffers[self._current_buffer_index]
+            avaliable = min(buffer_hash.available_bits(), bits)
+            took = buffer_hash.take(avaliable)
             result = (result << avaliable) + took
             bits -= avaliable
             self._available_bits -= avaliable
 
-            if hash.available_bits() == 0:
+            if buffer_hash.available_bits() == 0:
                 self._current_buffer_index += 1
         return result
     
     def untake(self, bits: int) -> None:
         while bits > 0:
-            hash = self._buffers[self._current_buffer_index]
-            avaliable_for_untake = min(hash.total_bits() - hash.available_bits(), bits)
-            hash.untake(avaliable_for_untake)
+            buffer_hash = self._buffers[self._current_buffer_index]
+            avaliable_for_untake = min(buffer_hash.total_bits() - buffer_hash.available_bits(), bits)
+            buffer_hash.untake(avaliable_for_untake)
             bits -= avaliable_for_untake
             self._available_bits += avaliable_for_untake
 
-            if self._current_buffer_index > 0 and hash.total_bits() == hash.available_bits():
+            if self._current_buffer_index > 0 and buffer_hash.total_bits() == buffer_hash.available_bits():
                 self._depth -= 1
                 self._current_buffer_index -= 1
 

@@ -60,7 +60,7 @@ class ConsumableBuffer:
         return result
     
     def untake(self, bits: int) -> None:
-          self._current_bit_pos += bits
-          while self._current_bit_pos > 7:
-              self._current_bit_pos -= 8
-              self._current_byte_pos += 1
+        self._current_bit_pos += bits
+        while self._current_bit_pos > 7:
+            self._current_bit_pos -= 8
+            self._current_byte_pos += 1
