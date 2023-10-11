@@ -6,7 +6,7 @@ HashFunction = Callable[[bytes], bytes]
 InfiniteWrapper = Callable[[Union['InfiniteHash', bytes]], 'InfiniteHash']
 
 def wrap_hash(hash_function: HashFunction) -> InfiniteWrapper:
-    def hashing(value: bytes | InfiniteHash):
+    def hashing(value: Union[bytes, InfiniteHash]):
         if isinstance(value, InfiniteHash):
             return value
         return InfiniteHash(value, hash_function)
