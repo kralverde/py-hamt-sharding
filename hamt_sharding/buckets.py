@@ -8,17 +8,17 @@ K = TypeVar('K', str, bytes)
 V = TypeVar('V')
 
 @attr.define(slots=True)
-class BucketChild(Generic[K, V]):
+class HAMTBucketChild(Generic[K, V]):
     key: K
     value: V
     hash: InfiniteHash
 
 @attr.define(slots=True)
-class BucketPosition(Generic[K, V]):
+class HAMTBucketPosition(Generic[K, V]):
     bucket: 'HAMTBucket[K, V]'
     pos: int
     hash: InfiniteHash
-    existing_child: Optional[BucketChild[K, V]]
+    existing_child: Optional[HAMTBucketChild[K, V]]
 
 class HAMTBucket(MutableMapping[K, V]):
     def __init__(self, bits: int, hash: InfiniteWrapper, parent: Optional['HAMTBucket[K, V]'] = None, pos_at_parent: int = 0):
@@ -27,7 +27,7 @@ class HAMTBucket(MutableMapping[K, V]):
         self._pop_count = 0
         self._parent = parent
         self._pos_at_parent = pos_at_parent
-        self._children = SparseArray[Union[HAMTBucket[K, V], BucketChild[K, V]]]()
+        self._children = SparseArray[Union[HAMTBucket[K, V], HAMTBucketChild[K, V]]]()
         self.key: Optional[K] = None
 
     @classmethod
@@ -87,10 +87,10 @@ class HAMTBucket(MutableMapping[K, V]):
     def children_count(self):
         return len(self._children)
 
-    def only_child(self) -> Optional[BucketChild[K, V]]:
+    def only_child(self) -> Optional[HAMTBucketChild[K, V]]:
         return self._children.get(0)
 
-    def each_leaf_series(self) -> Generator[BucketChild[K, V], None, None]:
+    def each_leaf_series(self) -> Generator[HAMTBucketChild[K, V], None, None]:
         for _, child in self._children.items():
             if isinstance(child, HAMTBucket):
                 yield from child.each_leaf_series()
@@ -101,7 +101,7 @@ class HAMTBucket(MutableMapping[K, V]):
     def table_size(self):
         return pow(2, self._bits)
 
-    def _find_child(self, key: K) -> Optional[BucketChild[K, V]]:
+    def _find_child(self, key: K) -> Optional[HAMTBucketChild[K, V]]:
         result = self._find_place(key)
         child = result.bucket._at(result.pos)
         assert not isinstance(child, HAMTBucket)
@@ -109,7 +109,7 @@ class HAMTBucket(MutableMapping[K, V]):
             return child
         return None
 
-    def _find_place(self, key: Union[K, InfiniteHash]) -> BucketPosition[K, V]:
+    def _find_place(self, key: Union[K, InfiniteHash]) -> HAMTBucketPosition[K, V]:
         hash_value = self._hash(key.encode() if isinstance(key, str) else key)
         index = hash_value.take(self._bits)
 
@@ -118,9 +118,9 @@ class HAMTBucket(MutableMapping[K, V]):
         if isinstance(child, HAMTBucket):
             return child._find_place(hash_value)
         
-        return BucketPosition(self, index, hash_value, child)
+        return HAMTBucketPosition(self, index, hash_value, child)
     
-    def _find_new_bucket_and_pos(self, key: Union[str, InfiniteHash]) -> BucketPosition[K, V]:
+    def _find_new_bucket_and_pos(self, key: Union[str, InfiniteHash]) -> HAMTBucketPosition[K, V]:
         place = self._find_place(key)
         if place.existing_child is not None and place.existing_child.key != key:
             bucket = HAMTBucket(self._bits, self._hash, place.bucket, place.pos)
@@ -132,10 +132,10 @@ class HAMTBucket(MutableMapping[K, V]):
             return bucket._find_new_bucket_and_pos(place.hash)
         return place
 
-    def _put_at(self, place: BucketPosition[K, V], key: K, value: V):
-        self._put_object_at(place.pos, BucketChild(key, value, place.hash))
+    def _put_at(self, place: HAMTBucketPosition[K, V], key: K, value: V):
+        self._put_object_at(place.pos, HAMTBucketChild(key, value, place.hash))
 
-    def _put_object_at(self, pos: int, object: Union['HAMTBucket[K, V]', BucketChild[K, V]]):
+    def _put_object_at(self, pos: int, object: Union['HAMTBucket[K, V]', HAMTBucketChild[K, V]]):
         if self._children.get(pos) is None:
             self._pop_count += 1
         self._children[pos] = object
@@ -156,7 +156,7 @@ class HAMTBucket(MutableMapping[K, V]):
                 only_child = next(self._children.values())
                 if only_child is not None and not isinstance(only_child, HAMTBucket):
                     only_child.hash.untake(self._bits)
-                    place = BucketPosition(self._parent, 
+                    place = HAMTBucketPosition(self._parent, 
                                            self._pos_at_parent,
                                            only_child.hash,
                                            None)

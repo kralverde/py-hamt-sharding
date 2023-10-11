@@ -55,7 +55,8 @@ def test_hamt():
     assert bucket['100'] == '100'
 
     bucket = HAMTBucket[bytes, int].create_hamt(small_hash_fn)
-    bucket['test'] = 100
-    assert bucket['test'] == 100
-
-    bucket = HAMTBucket[object, int].create_hamt(small_hash_fn)
+    bucket[b'test'] = 100
+    assert bucket[b'test'] == 100
+    assert list(bucket.keys()) == [b'test']
+    assert list(bucket.values()) == [100]
+    
